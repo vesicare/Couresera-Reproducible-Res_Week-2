@@ -1,0 +1,118 @@
+#Week 2 assignment
+run in the directory of "activity.csv"
+
+##Load packages
+```{r setup, echo=TRUE}
+library(dplyr); library(ggplot2);library(dplyr); library(ggplot2)
+library(lubridate)
+```
+##Read data
+```{r read_data}
+data<-read.csv("activity.csv", header=T) 
+data$date<-as.Date(data$date)
+```
+##The total number of steps taken each day with
+```{r plot 1}
+N.Steps.Day<-data %>% group_by(date) %>% summarise(Number.Steps= sum(steps)) %>%
+    data.frame
+g<- ggplot(N.Steps.Day, aes(Number.Steps)) + geom_histogram()+
+    xlab("Total Number of Steps per day") + ylab("Frequency")+
+    ggtitle("Total number of steps taken each day")
+cat("The mean and median number of steps taken per day")
+N.Steps.Day %>% summarise(Mean_number_steps=mean(Number.Steps, na.rm=T),
+                          Medain_number_steps=median(N.Steps.Day$Number.Steps, na.rm=T))
+print(g)
+```
+##What is the average daily activity pattern?
+```{r plot 2}
+Day.Mean.Median<-data %>% group_by(date) %>% select(steps:date) %>% 
+        summarise(mean= mean(steps), median=median(steps)) %>% data.frame
+data$mean <- NA; data$median <- NA
+Dates<-unique(data$date)
+for(date in Dates){
+    data$mean[data$date == date] <- 
+        Day.Mean.Median$mean[Day.Mean.Median$date ==date]
+    data$median[data$date == date] <- 
+        Day.Mean.Median$median[Day.Mean.Median$date ==date]
+}
+data$hour <-data$interval %/% 100
+data$minute <-data$interval %% 100
+data$date2<-ymd(data$date)
+hour(data$date2) <-data$hour
+minute(data$date2) <-data$minute
+with(data, plot(date2, steps, type="l", col='black',
+                ylim = c(0,1000), ylab="", xlab=""))
+par(new=T)
+with(data, plot(date2, mean, type="l", col='blue', pch=20,lwd=3,
+    ylim = c(0,1000), ylab="", xlab=""))
+par(new=T)
+with(data, plot(date2, median, type="l", col='red', pch=18,lwd=3,
+    ylim = c(0,1000), ylab="Mean or Median Number of Steps",
+    xlab="Date, 5 minute intervals",
+    main="Mean and median number of steps per day"))
+legend("topleft", legend=c("Steps per 5 min", "Mean steps/5 min","Medain steps/5 min"),
+       lty = 1, col=c("black","blue","red"), cex=0.6)
+```
+##Which 5-minute interval contains Max?
+```{r Max step during 5 min each day}
+max.steps<- tapply(data$steps, data$date, max)
+library(foreach)
+max_step_day_interval <- foreach(i =1:length(max.steps), .combine = rbind)%do% {
+      with(data, data[!is.na(steps) & date== names(max.steps)[i] &
+                    steps==max.steps[[2]], c(2,3)])
+}
+print(max_step_day_interval)
+```
+##Imputing missing values
+*Number of rows with missing "steps" values
+```{r report number NAs}
+sum(is.na(data$steps))
+```
+*Fill these missing cells with value from 0 to overall mean + 30% sd
+```{r imputation}
+m<-mean(data$steps,na.rm=T); sd<-sd(data$steps,na.rm=T)
+set.seed(123)
+imputation=runif(sum(is.na(data$steps)), 0, m+0.3*sd)
+data$steps[is.na(data$steps)]<- imputation
+```
+##The total number of steps taken each day with imputation
+```{r plot 3}
+N.Steps.Day<-data %>% select(steps:interval) %>% group_by(date) %>% summarise(Number.Steps= sum(steps)) %>% data.frame
+ggplot(N.Steps.Day, aes(Number.Steps)) + geom_histogram()+
+    xlab("Total Number of Steps per day") + ylab("Frequency")+
+    ggtitle("Imutation, Total number of steps taken each day")
+```
+##The mean and median total number of steps taken per day with imputation
+```{r report mean medain after imputation}
+N.Steps.Day %>% summarise(Mean_number_steps=mean(Number.Steps, na.rm=T),
+                          Medain_number_steps=median(N.Steps.Day$Number.Steps, na.rm=T))
+```
+##Are there differences in activity patterns between weekdays and weekends?
+```{r weekday}
+data$weekday <- weekdays(data$date)
+data$weekday[data$weekday %in% c("Sunday", "Saturday")] <- "weekend"
+data$weekday[data$weekday %in% c("Monday", "Tuesday", "Wednesday","Thursday","Friday")] <- "weekday"
+#split into weekday and weekend data
+weekday<-data[data$weekday =="weekday",]
+weekend<-data[data$weekday =="weekend",]
+#plot weekday and weekend days
+par(mfrow=c(1,2))
+#plot week day
+with(weekday, plot(interval, steps, type="l", col='black', xlim = c(0,2400),
+                ylim = c(0,1000), ylab="", xlab=""))
+par(new=T)
+with(weekday, plot(interval, mean, type="l", col='red', lwd=0.1, xlim = c(0,2400),
+    ylim = c(0,1000), ylab="Number of Steps", xlab="Interval"))
+legend("topright", legend=c("Steps per 5 min", "Mean steps/ 5 min"),
+       lty = 1, col=c("black","red"), cex = 0.7)
+title(main = "Week days")
+#plot weekend day
+with(weekend, plot(interval, steps, type="l", col='black',xlim = c(0,2400),
+                ylim = c(0,1000), ylab=""))
+par(new=T)
+with(weekend, plot(interval, mean, type="l", col='red', lwd=0.1, xlim = c(0,2400),
+    ylim = c(0,1000), ylab="Number of Steps", xlab="Interval"))
+legend("topright", legend=c("Steps per 5 min", "Mean steps/ 5 min"),
+       lty = 1, col=c("black","red"), cex = 0.7)
+title(main = "Weekend days")
+```
